@@ -1,9 +1,13 @@
+import { mkdtemp, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { resolve, join } from "node:path";
 import { Type } from "typebox";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
   truncateHead,
   DEFAULT_MAX_BYTES,
   DEFAULT_MAX_LINES,
+  formatSize,
 } from "@earendil-works/pi-coding-agent";
 import type { LspManager } from "./manager.js";
 
@@ -15,14 +19,27 @@ function posParams() {
   });
 }
 
-function formatResult(obj: unknown): string {
+async function formatResult(obj: unknown): Promise<{ text: string; details?: any }> {
   const json = JSON.stringify(obj, null, 2);
   const t = truncateHead(json, { maxLines: DEFAULT_MAX_LINES, maxBytes: DEFAULT_MAX_BYTES });
-  if (!t.truncated) return t.content;
-  return (
+  if (!t.truncated) {
+    return { text: t.content };
+  }
+
+  const dir = await mkdtemp(join(tmpdir(), "pi-lsp-"));
+  const tempFile = join(dir, "result.json");
+  await writeFile(tempFile, json, "utf8");
+
+  const text =
     t.content +
-    `\n\n[Truncated: ${t.outputLines}/${t.totalLines} lines, ${t.outputBytes}/${t.totalBytes} bytes]`
-  );
+    `\n\n[Output truncated: showing ${t.outputLines} of ${t.totalLines} lines ` +
+    `(${formatSize(t.outputBytes)} of ${formatSize(t.totalBytes)}). ` +
+    `Full output: ${tempFile}]`;
+
+  return {
+    text,
+    details: { truncation: t, fullOutputPath: tempFile },
+  };
 }
 
 export function registerLspTools(pi: ExtensionAPI, getManager: () => LspManager) {
@@ -39,7 +56,7 @@ export function registerLspTools(pi: ExtensionAPI, getManager: () => LspManager)
       label,
       description,
       parameters,
-      async execute(_id, params, signal) {
+      async execute(_id, params, signal, _onUpdate, ctx) {
         if (signal?.aborted) {
           return {
             content: [{ type: "text", text: "Cancelled" }],
@@ -48,10 +65,19 @@ export function registerLspTools(pi: ExtensionAPI, getManager: () => LspManager)
         }
         const mgr = getManager();
         const args = params as Record<string, any>;
-        const result = await mgr.request(args.path, method, buildParams(args));
+        let filePath = args.path;
+        if (typeof filePath === "string") {
+          filePath = filePath.replace(/^@/, "");
+          if (!filePath.startsWith("/")) {
+            filePath = resolve(ctx.cwd, filePath);
+          }
+        }
+        const normalizedArgs = { ...args, path: filePath };
+        const result = await mgr.request(filePath, method, buildParams(normalizedArgs));
+        const formatted = await formatResult(result);
         return {
-          content: [{ type: "text", text: formatResult(result) }],
-          details: { raw: result },
+          content: [{ type: "text", text: formatted.text }],
+          details: { raw: result, ...formatted.details },
         };
       },
     });
