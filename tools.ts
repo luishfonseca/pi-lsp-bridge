@@ -1,8 +1,7 @@
-import { mkdtemp, writeFile, readFile, access } from "node:fs/promises";
-import { tmpdir } from "node:os";
-import { resolve, join } from "node:path";
+import { readFile, access } from "node:fs/promises";
+import { resolve } from "node:path";
+import { Markdown, type MarkdownTheme } from "@earendil-works/pi-tui";
 import { Type } from "typebox";
-import { TextDocument } from "vscode-languageserver-textdocument";
 import type { Range } from "vscode-languageserver-protocol";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
@@ -12,6 +11,13 @@ import {
   formatSize,
 } from "@earendil-works/pi-coding-agent";
 import type { LspManager } from "./manager.js";
+import {
+  renderHover,
+  renderLocations,
+  renderDocumentSymbols,
+  renderWorkspaceSymbols,
+  type RenderContext,
+} from "./render.js";
 
 function normalizePath(input: string, cwd: string): string {
   let path = input.replace(/^@/, "");
@@ -26,30 +32,20 @@ const CANCELLED = {
   details: { raw: null },
 };
 
-async function formatResult(obj: unknown): Promise<{ text: string; details?: any }> {
-  const json = JSON.stringify(obj, null, 2);
-  const t = truncateHead(json, { maxLines: DEFAULT_MAX_LINES, maxBytes: DEFAULT_MAX_BYTES });
+async function formatResult(text: string): Promise<{ text: string; details?: any }> {
+  const t = truncateHead(text, { maxLines: DEFAULT_MAX_LINES, maxBytes: DEFAULT_MAX_BYTES });
   if (!t.truncated) {
     return { text: t.content };
   }
 
-  const dir = await mkdtemp(join(tmpdir(), "pi-lsp-"));
-  const tempFile = join(dir, "result.json");
-  await writeFile(tempFile, json, "utf8");
-
-  const text =
-    t.content +
-    `\n\n[Output truncated: showing ${t.outputLines} of ${t.totalLines} lines ` +
-    `(${formatSize(t.outputBytes)} of ${formatSize(t.totalBytes)}). ` +
-    `Full output: ${tempFile}]`;
-
   return {
-    text,
-    details: { truncation: t, fullOutputPath: tempFile },
+    text:
+      t.content +
+      `\n\n[Output truncated: showing ${t.outputLines} of ${t.totalLines} lines ` +
+      `(${formatSize(t.outputBytes)} of ${formatSize(t.totalBytes)}).]`,
+    details: { truncation: t },
   };
 }
-
-// ─── Position resolution ───────────────────────────────────────────
 
 async function resolvePosition(
   filePath: string,
@@ -64,14 +60,15 @@ async function resolvePosition(
 
   const content = await readFile(filePath, "utf8");
   const lines = content.split("\n");
+  const zeroBasedLine = line - 1;
 
-  if (line < 0 || line >= lines.length) {
+  if (zeroBasedLine < 0 || zeroBasedLine >= lines.length) {
     throw new Error(
-      `Line ${line} is out of bounds. File has ${lines.length} lines (valid: 0-${lines.length - 1}).`
+      `Line ${line} is out of bounds. File has ${lines.length} lines (valid: 1–${lines.length}).`
     );
   }
 
-  const lineText = lines[line];
+  const lineText = lines[zeroBasedLine];
   let character: number;
 
   if (name) {
@@ -79,151 +76,29 @@ async function resolvePosition(
     if (idx !== -1) {
       character = idx;
     } else {
-      const match = lineText.match(/\S/);
-      character = match ? match.index! : 0;
+      throw new Error(`Name "${name}" not found on line ${line}.`);
     }
   } else {
     const match = lineText.match(/\S/);
     character = match ? match.index! : 0;
   }
 
-  return { line, character: Math.min(character, lineText.length) };
+  return { line: zeroBasedLine, character: Math.min(character, lineText.length) };
 }
 
-// ─── Post-processing helpers ───────────────────────────────────────
-
-const symbolKindNames: Record<number, string> = {
-  1: "File",
-  2: "Module",
-  3: "Namespace",
-  4: "Package",
-  5: "Class",
-  6: "Method",
-  7: "Property",
-  8: "Field",
-  9: "Constructor",
-  10: "Enum",
-  11: "Interface",
-  12: "Function",
-  13: "Variable",
-  14: "Constant",
-  15: "String",
-  16: "Number",
-  17: "Boolean",
-  18: "Array",
-  19: "Object",
-  20: "Key",
-  21: "Null",
-  22: "EnumMember",
-  23: "Struct",
-  24: "Event",
-  25: "Operator",
-  26: "TypeParameter",
-};
-
-function resolveKinds(value: unknown): unknown {
-  if (Array.isArray(value)) {
-    return value.map(resolveKinds);
-  }
-  if (value && typeof value === "object") {
-    const obj = value as Record<string, unknown>;
-    const result: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(obj)) {
-      if (k === "kind" && typeof v === "number") {
-        result[k] = symbolKindNames[v] ?? v;
-      } else {
-        result[k] = resolveKinds(v);
-      }
-    }
-    return result;
-  }
-  return value;
-}
-
-function formatRange(range: Range): string {
-  const { start, end } = range;
-  if (start.line === end.line) {
-    if (start.character === end.character) {
-      return `${start.line}:${start.character}`;
-    }
-    return `${start.line}:${start.character}–${end.character}`;
-  }
-  return `${start.line}:${start.character}–${end.line}:${end.character}`;
-}
-
-function isRange(value: unknown): value is Range {
-  if (!value || typeof value !== "object") return false;
-  const obj = value as Record<string, unknown>;
-  const start = obj.start;
-  const end = obj.end;
-  if (!start || !end || typeof start !== "object" || typeof end !== "object") return false;
-  const s = start as Record<string, unknown>;
-  const e = end as Record<string, unknown>;
-  return (
-    typeof s.line === "number" &&
-    typeof s.character === "number" &&
-    typeof e.line === "number" &&
-    typeof e.character === "number"
-  );
-}
-
-function extractUri(obj: Record<string, unknown>): string | undefined {
-  if (typeof obj.uri === "string") return obj.uri;
-  if (obj.location && typeof obj.location === "object") {
-    const loc = obj.location as Record<string, unknown>;
-    if (typeof loc.uri === "string") return loc.uri;
-  }
-  return undefined;
-}
-
-async function resolveRanges(
-  value: unknown,
-  readSnippet: (uri: string, range: Range) => Promise<string | undefined>,
-  uri?: string
-): Promise<unknown> {
-  if (Array.isArray(value)) {
-    return Promise.all(value.map((v) => resolveRanges(v, readSnippet, uri)));
-  }
-
-  if (value && typeof value === "object") {
-    const obj = value as Record<string, unknown>;
-    const nextUri = extractUri(obj) ?? uri;
-
-    if (isRange(obj)) {
-      const snippet = nextUri ? await readSnippet(nextUri, obj) : undefined;
-      const result: Record<string, unknown> = {
-        location: formatRange(obj),
-      };
-      if (snippet !== undefined) {
-        result.snippet = snippet;
-      }
-      return result;
-    }
-
-    const result: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(obj)) {
-      result[k] = await resolveRanges(v, readSnippet, nextUri);
-    }
-    return result;
-  }
-
-  return value;
-}
-
-// ─── LSP request wrapper ───────────────────────────────────────────
-
-async function lspRequest(
+async function lspRequest<T>(
   mgr: LspManager,
   method: string,
   params: unknown,
-  options: { filePath?: string; broadcast?: boolean }
+  options: { filePath?: string; broadcast?: boolean; cwd: string },
+  render: (result: T, ctx: RenderContext) => Promise<string>
 ) {
-  let result: unknown;
+  let result: T;
   try {
     if (options.broadcast) {
-      result = await mgr.requestAll(method, params);
+      result = (await mgr.requestAll(method, params)) as T;
     } else {
-      result = await mgr.request(options.filePath, method, params);
+      result = (await mgr.request(options.filePath, method, params)) as T;
     }
   } catch (err: any) {
     const rawMsg = err?.message ?? String(err);
@@ -241,8 +116,10 @@ async function lspRequest(
     };
   }
 
-  const withKinds = resolveKinds(result);
   const defaultUri = options.filePath ? `file://${options.filePath}` : undefined;
+
+  const language = options.filePath ? mgr.resolveServerKey(options.filePath) : undefined;
+
   const fileCache = new Map<string, string>();
 
   const readSnippet = async (uri: string, range: Range): Promise<string | undefined> => {
@@ -256,12 +133,15 @@ async function lspRequest(
         return undefined;
       }
     }
-    const doc = TextDocument.create(uri, "plaintext", 1, text);
-    return doc.getText(range);
+    const lines = text.split("\n");
+    const start = Math.max(0, range.start.line);
+    const end = Math.min(lines.length - 1, range.end.line);
+    if (start > end) return undefined;
+    return lines.slice(start, end + 1).join("\n");
   };
 
-  const transformed = await resolveRanges(withKinds, readSnippet, defaultUri);
-  const formatted = await formatResult(transformed);
+  const rendered = await render(result, { readSnippet, defaultUri, language, cwd: options.cwd });
+  const formatted = await formatResult(rendered);
 
   return {
     content: [{ type: "text" as const, text: formatted.text }],
@@ -269,7 +149,38 @@ async function lspRequest(
   };
 }
 
-// ─── Tool registration ─────────────────────────────────────────────
+// HACK: not really sure why this is needed
+//
+// I was getting a crash at startup because of a mismatch
+// between the nix installed pi and the local npm package
+// Once nix is also using earendil-works this can be removed
+function makeMarkdownTheme(theme: any): MarkdownTheme {
+  return {
+    heading: (t: string) => theme.fg("mdHeading", t),
+    link: (t: string) => theme.fg("mdLink", t),
+    linkUrl: (t: string) => theme.fg("mdLinkUrl", t),
+    code: (t: string) => theme.fg("mdCode", t),
+    codeBlock: (t: string) => theme.fg("mdCodeBlock", t),
+    codeBlockBorder: (t: string) => theme.fg("mdCodeBlockBorder", t),
+    quote: (t: string) => theme.fg("mdQuote", t),
+    quoteBorder: (t: string) => theme.fg("mdQuoteBorder", t),
+    hr: (t: string) => theme.fg("mdHr", t),
+    listBullet: (t: string) => theme.fg("mdListBullet", t),
+    bold: (t: string) => theme.bold(t),
+    italic: (t: string) => theme.italic(t),
+    strikethrough: (t: string) => theme.strikethrough(t),
+    underline: (t: string) => theme.underline(t),
+  };
+}
+
+function lspRenderResult(
+  result: { content?: Array<{ type: string; text?: string }> },
+  _options: any,
+  theme: any
+) {
+  const text = result.content?.find((c) => c.type === "text")?.text ?? "";
+  return new Markdown(text, 0, 0, makeMarkdownTheme(theme));
+}
 
 export async function registerLspTools(pi: ExtensionAPI, getManager: () => LspManager) {
   pi.registerTool({
@@ -280,8 +191,10 @@ export async function registerLspTools(pi: ExtensionAPI, getManager: () => LspMa
     promptGuidelines: ["Use lsp_hover when you need to verify a symbol's type or documentation."],
     parameters: Type.Object({
       path: Type.String(),
-      line: Type.Number(),
-      name: Type.Optional(Type.String()),
+      line: Type.Number({ description: "1-indexed line number" }),
+      name: Type.Optional(
+        Type.String({ description: "Symbol name that must appear literally on the given line" })
+      ),
     }),
     async execute(_id, params, signal, _onUpdate, ctx) {
       if (signal?.aborted) return CANCELLED;
@@ -295,9 +208,11 @@ export async function registerLspTools(pi: ExtensionAPI, getManager: () => LspMa
           textDocument: { uri: `file://${filePath}` },
           position: { line, character },
         },
-        { filePath }
+        { filePath, cwd: ctx.cwd },
+        renderHover
       );
     },
+    renderResult: lspRenderResult,
   });
 
   pi.registerTool({
@@ -308,8 +223,10 @@ export async function registerLspTools(pi: ExtensionAPI, getManager: () => LspMa
     promptGuidelines: ["Use lsp_definition to find where a symbol is declared."],
     parameters: Type.Object({
       path: Type.String(),
-      line: Type.Number(),
-      name: Type.Optional(Type.String()),
+      line: Type.Number({ description: "1-indexed line number" }),
+      name: Type.Optional(
+        Type.String({ description: "Symbol name that must appear literally on the given line" })
+      ),
     }),
     async execute(_id, params, signal, _onUpdate, ctx) {
       if (signal?.aborted) return CANCELLED;
@@ -323,9 +240,11 @@ export async function registerLspTools(pi: ExtensionAPI, getManager: () => LspMa
           textDocument: { uri: `file://${filePath}` },
           position: { line, character },
         },
-        { filePath }
+        { filePath, cwd: ctx.cwd },
+        renderLocations
       );
     },
+    renderResult: lspRenderResult,
   });
 
   pi.registerTool({
@@ -336,8 +255,10 @@ export async function registerLspTools(pi: ExtensionAPI, getManager: () => LspMa
     promptGuidelines: ["Use lsp_references before refactoring to understand blast radius."],
     parameters: Type.Object({
       path: Type.String(),
-      line: Type.Number(),
-      name: Type.Optional(Type.String()),
+      line: Type.Number({ description: "1-indexed line number" }),
+      name: Type.Optional(
+        Type.String({ description: "Symbol name that must appear literally on the given line" })
+      ),
       includeDeclaration: Type.Optional(Type.Boolean({ default: true })),
     }),
     async execute(_id, params, signal, _onUpdate, ctx) {
@@ -358,9 +279,11 @@ export async function registerLspTools(pi: ExtensionAPI, getManager: () => LspMa
           position: { line, character },
           context: { includeDeclaration: args.includeDeclaration ?? true },
         },
-        { filePath }
+        { filePath, cwd: ctx.cwd },
+        renderLocations
       );
     },
+    renderResult: lspRenderResult,
   });
 
   pi.registerTool({
@@ -380,9 +303,11 @@ export async function registerLspTools(pi: ExtensionAPI, getManager: () => LspMa
         {
           textDocument: { uri: `file://${filePath}` },
         },
-        { filePath }
+        { filePath, cwd: ctx.cwd },
+        renderDocumentSymbols
       );
     },
+    renderResult: lspRenderResult,
   });
 
   pi.registerTool({
@@ -392,17 +317,17 @@ export async function registerLspTools(pi: ExtensionAPI, getManager: () => LspMa
     promptSnippet: "Search symbols workspace-wide",
     promptGuidelines: ["Use lsp_workspace_symbol when you know a name but not its file."],
     parameters: Type.Object({ query: Type.String() }),
-    async execute(_id, params, signal) {
+    async execute(_id, params, signal, _onUpdate, ctx) {
       if (signal?.aborted) return CANCELLED;
       const args = params as { query: string };
       return lspRequest(
         getManager(),
         "workspace/symbol",
         { query: args.query },
-        {
-          broadcast: true,
-        }
+        { broadcast: true, cwd: ctx.cwd },
+        renderWorkspaceSymbols
       );
     },
+    renderResult: lspRenderResult,
   });
 }
