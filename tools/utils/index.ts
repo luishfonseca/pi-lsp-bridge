@@ -1,6 +1,11 @@
 export { RenderContext } from "./types.js";
 export { normalizePath, assertFileExists } from "./path.js";
-export { resolvePosition, resolveRange, formatFuzzyWarning, type FuzzyMatchInfo } from "./position.js";
+export {
+  resolvePosition,
+  resolveRange,
+  formatFuzzyWarning,
+  type FuzzyMatchInfo,
+} from "./position.js";
 export { formatResult, formatRange, formatFilePath, formatKind } from "./format.js";
 export { createSnippetReader } from "./snippets.js";
 export { lspRequest, lspTwoStepRequest } from "./lsp.js";

@@ -41,11 +41,7 @@ function findFuzzyNameMatch(
 
       if (idx !== -1) {
         const score = offset + (isCaseInsensitive ? 100 : 0);
-        if (
-          bestScore === null ||
-          score < bestScore ||
-          (score === bestScore && idx < bestChar)
-        ) {
+        if (bestScore === null || score < bestScore || (score === bestScore && idx < bestChar)) {
           bestScore = score;
           bestLine = candidateLine;
           bestChar = idx;

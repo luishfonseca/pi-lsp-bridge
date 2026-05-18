@@ -39,7 +39,10 @@ export function registerPositionTool<
     path: Type.String(),
     line: Type.Number({ description: "1-indexed line number" }),
     name: Type.Optional(
-      Type.String({ description: "Symbol name to look up. If not found on the exact line, the nearest match within ±10 lines is used with a warning." })
+      Type.String({
+        description:
+          "Symbol name to look up. If not found on the exact line, the nearest match within ±10 lines is used with a warning.",
+      })
     ),
     includeExternal: Type.Optional(
       Type.Boolean({

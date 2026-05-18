@@ -25,7 +25,10 @@ export function registerLspReferences(pi: ExtensionAPI, getManager: () => LspMan
       path: Type.String(),
       line: Type.Number({ description: "1-indexed line number" }),
       name: Type.Optional(
-        Type.String({ description: "Symbol name to look up. If not found on the exact line, the nearest match within ±10 lines is used with a warning." })
+        Type.String({
+          description:
+            "Symbol name to look up. If not found on the exact line, the nearest match within ±10 lines is used with a warning.",
+        })
       ),
       includeDeclaration: Type.Optional(Type.Boolean({ default: true })),
       includeExternal: Type.Optional(
