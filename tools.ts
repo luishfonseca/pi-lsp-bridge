@@ -188,7 +188,9 @@ export async function registerLspTools(pi: ExtensionAPI, getManager: () => LspMa
     label: "LSP Hover",
     description: "Get hover information (types, docs) from the language server",
     promptSnippet: "Get type/docs info at a file position",
-    promptGuidelines: ["Use lsp_hover when you need to verify a symbol's type or documentation."],
+    promptGuidelines: [
+      "Prefer lsp_hover over read when you need a symbol's type, documentation, or signature. It is faster and more precise.",
+    ],
     parameters: Type.Object({
       path: Type.String(),
       line: Type.Number({ description: "1-indexed line number" }),
@@ -220,7 +222,9 @@ export async function registerLspTools(pi: ExtensionAPI, getManager: () => LspMa
     label: "LSP Definition",
     description: "Go to definition via LSP",
     promptSnippet: "Jump to a symbol's definition",
-    promptGuidelines: ["Use lsp_definition to find where a symbol is declared."],
+    promptGuidelines: [
+      "Use lsp_definition to jump directly to a symbol's declaration instead of guessing filenames or grepping.",
+    ],
     parameters: Type.Object({
       path: Type.String(),
       line: Type.Number({ description: "1-indexed line number" }),
@@ -252,7 +256,9 @@ export async function registerLspTools(pi: ExtensionAPI, getManager: () => LspMa
     label: "LSP References",
     description: "Find references to a symbol via LSP",
     promptSnippet: "Find all usages of a symbol",
-    promptGuidelines: ["Use lsp_references before refactoring to understand blast radius."],
+    promptGuidelines: [
+      "Use lsp_references before any refactoring to understand blast radius. Do not rely on grep for this.",
+    ],
     parameters: Type.Object({
       path: Type.String(),
       line: Type.Number({ description: "1-indexed line number" }),
@@ -291,7 +297,9 @@ export async function registerLspTools(pi: ExtensionAPI, getManager: () => LspMa
     label: "LSP Document Symbols",
     description: "Get outline (functions, classes, variables) of a file",
     promptSnippet: "List symbols in a file",
-    promptGuidelines: ["Use lsp_document_symbols to build a mental map of an unfamiliar file."],
+    promptGuidelines: [
+      "Use lsp_document_symbols to understand a file's structure before reading it manually.",
+    ],
     parameters: Type.Object({ path: Type.String() }),
     async execute(_id, params, signal, _onUpdate, ctx) {
       if (signal?.aborted) return CANCELLED;
@@ -315,7 +323,9 @@ export async function registerLspTools(pi: ExtensionAPI, getManager: () => LspMa
     label: "LSP Workspace Symbol",
     description: "Search symbols across the entire workspace",
     promptSnippet: "Search symbols workspace-wide",
-    promptGuidelines: ["Use lsp_workspace_symbol when you know a name but not its file."],
+    promptGuidelines: [
+      "Use lsp_workspace_symbol when you know a symbol name but not its file. Do not guess paths.",
+    ],
     parameters: Type.Object({ query: Type.String() }),
     async execute(_id, params, signal, _onUpdate, ctx) {
       if (signal?.aborted) return CANCELLED;
