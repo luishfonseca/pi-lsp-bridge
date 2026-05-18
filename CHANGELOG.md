@@ -1,5 +1,13 @@
 # pi-lsp-bridge
 
+## 1.2.1
+
+### Patch Changes
+
+- 99c1fc3: Remove unused variables to fix lint errors
+  - Drop unused `k` from `for...of` loop in `manager.ts`
+  - Remove unused `_preset` parameter from `registerLspTools` in `tools.ts` (and its caller in `index.ts`)
+
 ## 1.2.0
 
 ### Minor Changes
