@@ -1,0 +1,11 @@
+{
+  "name": "pi-lsp-bridge",
+  "dependencies": {
+    "@lspeasy/client": "^3.0.3",
+    "@lspeasy/core": "^2.1.3",
+    "typebox": "^0"
+  },
+  "pi": {
+    "extensions": ["./index.ts"]
+  }
+}
