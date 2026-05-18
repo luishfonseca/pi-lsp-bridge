@@ -22,9 +22,21 @@ export class LspManager {
     return `${this.rootUri}|${serverKey}`;
   }
 
-  private resolveServerKey(filePath: string): string | undefined {
-    const ext = filePath.slice(filePath.lastIndexOf(".")).toLowerCase();
-    return this.config.extMap[ext];
+  resolveServerKey(filePath: string): string | undefined {
+    const idx = filePath.lastIndexOf(".");
+    if (idx < 0) return undefined;
+    const ext = filePath.slice(idx + 1).toLowerCase();
+    for (const [serverKey, cfg] of Object.entries(this.config.servers)) {
+      const extensions = Array.isArray(cfg.extension)
+        ? cfg.extension
+        : cfg.extension
+          ? [cfg.extension]
+          : [];
+      if (extensions.includes(ext)) {
+        return serverKey;
+      }
+    }
+    return undefined;
   }
 
   private async ensureClient(serverKey: string): Promise<rpc.MessageConnection> {

@@ -26,18 +26,19 @@ Create `.pi/lsp.json` in your project root, or `~/.pi/agent/lsp.json` for a glob
 
 ```json
 {
-  "extMap": {
-    ".rs": "rust",
-    ".go": "go",
-    ".ts": "typescript",
-    ".js": "typescript"
-  },
   "servers": {
-    "rust": { "command": "rust-analyzer" },
-    "go": { "command": "gopls" },
+    "rust": {
+      "command": "rust-analyzer",
+      "extension": "rs"
+    },
+    "go": {
+      "command": "gopls",
+      "extension": "go"
+    },
     "typescript": {
       "command": "typescript-language-server",
-      "args": ["--stdio"]
+      "args": ["--stdio"],
+      "extension": ["ts", "js", "tsx", "jsx"]
     }
   }
 }

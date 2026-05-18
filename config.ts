@@ -4,11 +4,10 @@ import { resolve } from "node:path";
 export type ServerConfig = {
   command: string;
   args?: string[];
+  extension?: string | string[];
 };
 
 export type LspConfig = {
-  /** Map file extension (including dot) to server key */
-  extMap: Record<string, string>;
   /** Server definitions */
   servers: Record<string, ServerConfig>;
   /** Preset name (loads tools/<preset>.json). Defaults to "full". */
