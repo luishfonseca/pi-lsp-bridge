@@ -12,6 +12,7 @@ export function registerLspSignatureHelp(pi: ExtensionAPI, getManager: () => Lsp
     promptGuidelines: [
       "Use lsp_signature_help when inside a function call to see expected parameters and their types.",
       "Prefer lsp_signature_help over lsp_hover when actively typing inside a function call and need parameter guidance.",
+      "Target a parameter name or any token inside the parentheses, not the function name itself.",
     ],
     method: "textDocument/signatureHelp",
     render: renderSignatureHelp,

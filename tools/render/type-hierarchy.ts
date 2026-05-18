@@ -20,7 +20,7 @@ export async function renderTypeHierarchyItems(result: any[], ctx: RenderContext
 
     let line = `- **${name}** \`${kind}\`${detail}${extTag} (${filePath}:${range})`;
 
-    const snippet = ctx.readSnippet ? await ctx.readSnippet(item.uri, item.range) : undefined;
+    const snippet = ctx.readSnippet && !isExt ? await ctx.readSnippet(item.uri, item.range) : undefined;
     if (snippet !== undefined) {
       const fence = ctx.language ? "```" + ctx.language : "```";
       line += `\n${fence}\n${snippet}\n\`\`\``;

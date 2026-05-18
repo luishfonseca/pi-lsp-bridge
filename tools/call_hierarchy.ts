@@ -8,6 +8,7 @@ import {
   lspTwoStepRequest,
   normalizePath,
   resolvePosition,
+  formatFuzzyWarning,
 } from "./utils/index.js";
 
 export function registerLspCallHierarchy(pi: ExtensionAPI, getManager: () => LspManager) {
@@ -24,7 +25,7 @@ export function registerLspCallHierarchy(pi: ExtensionAPI, getManager: () => Lsp
       path: Type.String(),
       line: Type.Number({ description: "1-indexed line number" }),
       name: Type.Optional(
-        Type.String({ description: "Symbol name that must appear literally on the given line" })
+        Type.String({ description: "Symbol name to look up. If not found on the exact line, the nearest match within ±10 lines is used with a warning." })
       ),
       includeExternal: Type.Optional(
         Type.Boolean({
@@ -47,10 +48,10 @@ export function registerLspCallHierarchy(pi: ExtensionAPI, getManager: () => Lsp
         includeExternal?: boolean;
       };
       const filePath = normalizePath(args.path, ctx.cwd);
-      const { line, character } = await resolvePosition(filePath, args.line, args.name);
+      const { line, character, fuzzy } = await resolvePosition(filePath, args.line, args.name);
       const direction = args.direction ?? "incoming";
 
-      return lspTwoStepRequest(
+      const result = await lspTwoStepRequest(
         getManager(),
         "textDocument/prepareCallHierarchy",
         { textDocument: { uri: `file://${filePath}` }, position: { line, character } },
@@ -59,6 +60,14 @@ export function registerLspCallHierarchy(pi: ExtensionAPI, getManager: () => Lsp
         { filePath, cwd: ctx.cwd, includeExternal: args.includeExternal },
         renderCallHierarchyCalls
       );
+
+      if (fuzzy) {
+        result.content[0].text = formatFuzzyWarning(fuzzy) + result.content[0].text;
+        result.details = result.details ?? {};
+        result.details.fuzzy = fuzzy;
+      }
+
+      return result;
     },
     renderResult: lspRenderResult,
   });

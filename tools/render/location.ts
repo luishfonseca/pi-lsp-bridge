@@ -16,7 +16,8 @@ async function renderSingleLocation(
     const filePath = formatFilePath(loc.targetUri, ctx.cwd);
     const extTag = formatExternalTag(loc.targetUri, ctx);
     const locStr = `${filePath}:${formatRange(loc.targetRange)}${extTag}`;
-    const snippet = ctx.readSnippet
+    const isExt = ctx.isExternal?.(loc.targetUri) ?? false;
+    const snippet = ctx.readSnippet && !isExt
       ? await ctx.readSnippet(loc.targetUri, loc.targetRange)
       : undefined;
     if (snippet !== undefined) {
@@ -29,7 +30,8 @@ async function renderSingleLocation(
   const filePath = formatFilePath(loc.uri, ctx.cwd);
   const extTag = formatExternalTag(loc.uri, ctx);
   const locStr = `${filePath}:${formatRange(loc.range)}${extTag}`;
-  const snippet = ctx.readSnippet ? await ctx.readSnippet(loc.uri, loc.range) : undefined;
+  const isExt = ctx.isExternal?.(loc.uri) ?? false;
+  const snippet = ctx.readSnippet && !isExt ? await ctx.readSnippet(loc.uri, loc.range) : undefined;
   if (snippet !== undefined) {
     const fence = ctx.language ? "```" + ctx.language : "```";
     return `${locStr}\n${fence}\n${snippet}\n\`\`\``;

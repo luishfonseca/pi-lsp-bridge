@@ -3,7 +3,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import type { LspManager } from "../../manager.js";
 import type { RenderContext } from "./types.js";
 import { normalizePath } from "./path.js";
-import { resolvePosition } from "./position.js";
+import { resolvePosition, formatFuzzyWarning } from "./position.js";
 import { lspRequest } from "./lsp.js";
 import { lspRenderResult } from "./result.js";
 
@@ -39,7 +39,7 @@ export function registerPositionTool<
     path: Type.String(),
     line: Type.Number({ description: "1-indexed line number" }),
     name: Type.Optional(
-      Type.String({ description: "Symbol name that must appear literally on the given line" })
+      Type.String({ description: "Symbol name to look up. If not found on the exact line, the nearest match within ±10 lines is used with a warning." })
     ),
     includeExternal: Type.Optional(
       Type.Boolean({
@@ -61,7 +61,7 @@ export function registerPositionTool<
       if (signal?.aborted) return CANCELLED;
       const args = params as TParams;
       const filePath = normalizePath(args.path, ctx.cwd);
-      const { line, character } = await resolvePosition(filePath, args.line, args.name);
+      const { line, character, fuzzy } = await resolvePosition(filePath, args.line, args.name);
 
       const lspParams: Record<string, unknown> = {
         textDocument: { uri: `file://${filePath}` },
@@ -72,7 +72,7 @@ export function registerPositionTool<
         Object.assign(lspParams, options.extraParams(args));
       }
 
-      return lspRequest(
+      const result = await lspRequest(
         getManager(),
         options.method,
         lspParams,
@@ -84,6 +84,14 @@ export function registerPositionTool<
         },
         options.render
       );
+
+      if (fuzzy) {
+        result.content[0].text = formatFuzzyWarning(fuzzy) + result.content[0].text;
+        result.details = result.details ?? {};
+        result.details.fuzzy = fuzzy;
+      }
+
+      return result;
     },
     renderResult: lspRenderResult,
   });

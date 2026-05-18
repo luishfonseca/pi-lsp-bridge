@@ -24,7 +24,7 @@ export async function renderCallHierarchyCalls(result: any[], ctx: RenderContext
     let line = `- **${name}** \`${kind}\`${detail}${extTag} (${filePath}:${range})`;
 
     const ranges = call.fromRanges ?? [];
-    if (ranges.length > 0 && ctx.readSnippet) {
+    if (ranges.length > 0 && ctx.readSnippet && !isExt) {
       const snippet = await ctx.readSnippet(item.uri, ranges[0]);
       if (snippet !== undefined) {
         const fence = ctx.language ? "```" + ctx.language : "```";
