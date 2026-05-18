@@ -2,6 +2,7 @@ import { spawn, ChildProcess } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import * as rpc from "vscode-jsonrpc/lib/node/main.js";
 
+import { minimatch } from "minimatch";
 import type { LspConfig } from "./config.js";
 
 type Connection = {
@@ -126,6 +127,33 @@ export class LspManager {
 
     const connection = await this.ensureClient(serverKey);
     return (await connection.sendRequest(method, params)) as T;
+  }
+
+  /** Check whether a URI points to an external (non-workspace) file */
+  isExternal(uri: string): boolean {
+    const absPath = uri.replace(/^file:\/\//, "");
+    const rootPath = this.rootUri.replace(/^file:\/\//, "");
+
+    // Tier 1: outside workspace
+    const isOutside = !(absPath === rootPath || absPath.startsWith(rootPath + "/"));
+    if (isOutside) return true;
+
+    // Tier 2: matches external patterns for the relevant server(s)
+    const serverKey = this.resolveServerKey(absPath);
+    const serversToCheck = serverKey ? [serverKey] : Object.keys(this.config.servers);
+
+    for (const sk of serversToCheck) {
+      const patterns = this.config.servers[sk]?.externalPatterns;
+      if (!patterns) continue;
+      for (const pattern of patterns) {
+        if (minimatch(absPath, pattern)) return true;
+      }
+    }
+    return false;
+  }
+
+  notifyUser(message: string, level?: "info" | "warning" | "error") {
+    this.notify(message, level);
   }
 
   async disconnectAll() {

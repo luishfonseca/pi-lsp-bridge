@@ -5,6 +5,8 @@ export type ServerConfig = {
   command: string;
   args?: string[];
   extension?: string | string[];
+  /** Glob patterns for files to treat as external. Example: `**\/node_modules\/**` */
+  externalPatterns?: string[];
 };
 
 export type LspConfig = {

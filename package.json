@@ -19,8 +19,8 @@
       "types": "./dist/manager.d.ts"
     },
     "./tools": {
-      "import": "./dist/tools.js",
-      "types": "./dist/tools.d.ts"
+      "import": "./dist/tools/index.js",
+      "types": "./dist/tools/index.d.ts"
     }
   },
   "files": [
@@ -31,10 +31,10 @@
   "scripts": {
     "build": "tsc",
     "clean": "rm -rf dist",
-    "fmt": "prettier --write '*.ts'",
-    "fmt:check": "prettier --check '*.ts'",
-    "lint": "eslint '*.ts'",
-    "lint:fix": "eslint --fix '*.ts'",
+    "fmt": "prettier --write '*.ts' 'tools/**/*.ts'",
+    "fmt:check": "prettier --check '*.ts' 'tools/**/*.ts'",
+    "lint": "eslint '*.ts' 'tools/**/*.ts'",
+    "lint:fix": "eslint --fix '*.ts' 'tools/**/*.ts'",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run lint && npm run fmt:check",
     "changeset": "changeset",
@@ -65,6 +65,7 @@
   },
   "dependencies": {
     "camelcase": "^9.0.0",
+    "minimatch": "^10.2.5",
     "vscode-jsonrpc": "^8.2.1",
     "vscode-languageserver-protocol": "^3.17.5"
   },

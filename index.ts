@@ -1,7 +1,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { loadConfig } from "./config.js";
 import { LspManager } from "./manager.js";
-import { registerLspTools } from "./tools.js";
+import { registerLspTools } from "./tools/index.js";
 
 export default async function (pi: ExtensionAPI) {
   let manager: LspManager | undefined;

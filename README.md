@@ -38,13 +38,18 @@ Create `.pi/lsp.json` in your project root, or `~/.pi/agent/lsp.json` for a glob
     "typescript": {
       "command": "typescript-language-server",
       "args": ["--stdio"],
-      "extension": ["ts", "js", "tsx", "jsx"]
+      "extension": ["ts", "js", "tsx", "jsx"],
+      "externalPatterns": ["**/node_modules/**"]
     }
   }
 }
 ```
 
 If no config is found, the extension loads but does nothing and shows a notice.
+
+### `externalPatterns`
+
+Each server entry may optionally include `externalPatterns`, an array of glob patterns (e.g. `**/node_modules/**`). Results from matching files are flagged as `(external)` in tool output. Tools that return locations also accept an `includeExternal` parameter — set it to `false` to hide external results entirely.
 
 ## Tools
 
