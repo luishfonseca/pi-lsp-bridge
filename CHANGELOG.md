@@ -1,5 +1,11 @@
 # pi-lsp-bridge
 
+## 2.0.1
+
+### Patch Changes
+
+- 9df4d0a: Strengthen promptGuidelines for all LSP tools to encourage the agent to prefer them over manual file operations like read, grep, and find.
+
 ## 2.0.0
 
 ### Major Changes
