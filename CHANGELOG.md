@@ -1,5 +1,11 @@
 # pi-lsp-bridge
 
+## 1.0.3
+
+### Patch Changes
+
+- Add missing `camelcase` direct dependency used by `@lspeasy/client`
+
 ## 1.0.2
 
 ### Patch Changes
