@@ -1,6 +1,10 @@
 import { Type } from "typebox";
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
-import { truncateHead, DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import {
+  truncateHead,
+  DEFAULT_MAX_BYTES,
+  DEFAULT_MAX_LINES,
+} from "@earendil-works/pi-coding-agent";
 import type { LspManager } from "./manager.js";
 
 function posParams() {

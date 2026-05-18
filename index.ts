@@ -1,4 +1,4 @@
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { loadConfig } from "./config.js";
 import { LspManager } from "./manager.js";
 import { registerLspTools } from "./tools.js";
