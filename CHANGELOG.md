@@ -1,5 +1,11 @@
 # pi-lsp-bridge
 
+## 1.1.1
+
+### Patch Changes
+
+- 211f322: Remove "LSP ready" status notice on session start
+
 ## 1.1.0
 
 ### Minor Changes
