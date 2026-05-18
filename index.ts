@@ -25,7 +25,6 @@ export default async function (pi: ExtensionAPI) {
     };
 
     await registerLspTools(pi, getManager, config.preset);
-    ctx.ui.setStatus("lsp", "LSP ready");
   });
 
   pi.on("session_shutdown", async () => {
