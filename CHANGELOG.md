@@ -1,5 +1,35 @@
 # pi-lsp-bridge
 
+## 2.0.0
+
+### Major Changes
+
+- 696b93e: Move extension mapping into server config
+
+  BREAKING CHANGE: the top-level `extMap` field has been removed from `LspConfig`. Each server entry now accepts an `extension` field (string or string array) that declares which file extensions it handles. `LspManager.resolveServerKey` iterates the server definitions at runtime to find a match.
+
+### Minor Changes
+
+- e3acab3: Render LSP tool results as markdown with TUI support
+
+  LSP tool responses are now rendered as human-readable markdown instead
+  of raw JSON. A new `render.ts` module handles formatting for hover,
+  definition, references, document symbols, and workspace symbols.
+  - Remove `vscode-languageserver-textdocument` dependency; snippet
+    extraction now uses simple line splitting.
+  - Add `renderResult` to all LSP tools for styled TUI output via
+    `@earendil-works/pi-tui`.
+  - Switch tool `line` parameters to 1-indexed (internally converted to
+    0-indexed for LSP).
+  - Truncated output no longer writes temporary files.
+
+- 2e7e42b: Enhance LSP tools with richer output and name-based position resolution
+  - Replace manual `character` parameter with optional `name` for hover, definition, and references tools; character is auto-resolved from the line content
+  - Add post-processing that resolves numeric LSP symbol kinds to human-readable names
+  - Convert `Range` objects into formatted location strings with inline code snippets
+  - Categorize LSP errors (server_crash, not_configured, not_found, request_failed)
+  - Add `vscode-languageserver-textdocument` dependency for accurate snippet extraction
+
 ## 1.2.1
 
 ### Patch Changes
