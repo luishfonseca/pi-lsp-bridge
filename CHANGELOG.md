@@ -1,5 +1,17 @@
 # pi-lsp-bridge
 
+## 1.2.0
+
+### Minor Changes
+
+- 37cdeff: Remove the JSON preset tool engine. Tools are now registered explicitly in `tools.ts` instead of being loaded from `tools/*.json` via mapper definitions. Delete `tools/full.json` and `PLAN.md`.
+- dc36ad2: Replace `@lspeasy/client` and `@lspeasy/core` with raw `vscode-jsonrpc` and `vscode-languageserver-protocol`. Rewrite `LspManager` to use `MessageConnection` directly with proper `initialize`/`initialized`, `shutdown`/`exit` lifecycle, error/close handlers, and UI notifications. Add `requestAll()` for broadcasting requests to all configured servers.
+- c62038f: Add `validatePosition` to check file existence and line/character bounds before LSP requests. Add `normalizePath` for consistent `@` prefix and relative path handling. Add `lspRequest` helper with centralized error formatting. Broadcast `workspace/symbol` queries across all configured servers via `requestAll()` and merge results.
+
+### Patch Changes
+
+- 8bb3397: Remove `"tools"` from `files` array in `package.json` since the preset directory was removed. Clarify AGENTS.md release instructions.
+
 ## 1.1.1
 
 ### Patch Changes
