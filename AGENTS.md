@@ -55,7 +55,7 @@ Or all at once:
 npm run version && git add . && git commit -m "chore: release"
 ```
 
-Tell the user to `npm run release`
+Tell the user to `npm run release`. The agent should not run this.
 
 Changesets handles semver automatically based on the accumulated changeset bump types.
 

@@ -25,7 +25,6 @@
   },
   "files": [
     "dist",
-    "tools",
     "README.md",
     "LICENSE"
   ],
