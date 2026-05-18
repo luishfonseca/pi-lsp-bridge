@@ -1,6 +1,6 @@
 {
   "name": "pi-lsp-bridge",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A config-driven Pi extension that connects language servers over stdio and exposes them as Pi tools",
   "type": "module",
   "main": "./dist/index.js",
@@ -38,6 +38,9 @@
     "lint:fix": "eslint --fix '*.ts'",
     "typecheck": "tsc --noEmit",
     "check": "npm run typecheck && npm run lint && npm run fmt:check",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "changeset publish",
     "prepublishOnly": "npm run clean && npm run check && npm run build"
   },
   "keywords": [
@@ -70,6 +73,7 @@
     "typebox": "*"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.31.0",
     "eslint": "^9.25.0",
     "prettier": "^3.5.0",
     "typescript": "^5.8.0",
