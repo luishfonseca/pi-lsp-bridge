@@ -2,37 +2,64 @@
 
 This project uses [Changesets](https://github.com/changesets/changesets) to manage versioning and changelogs.
 
-## Workflow
+## Creating a changeset
 
-1. **After making changes**, run:
+After making changes, create a changeset to describe what changed and how it should be versioned.
 
-   ```bash
-   npm run changeset
-   ```
+### Option 1: Interactive CLI
 
-   Select the bump type (patch / minor / major) and write a summary.
-   This creates a `.changeset/*.md` file describing the change.
+```bash
+npm run changeset
+```
 
-2. **Commit the changeset** along with your code:
+Follow the prompts to select the bump type (patch / minor / major) and write a summary.
 
-   ```bash
-   git add .
-   git commit -m "..."
-   ```
+### Option 2: Create the file manually
 
-3. **When ready to release**, run:
+The CLI is interactive even with flags, so for tool/automated use, write the file directly:
 
-   ```bash
-   npm run version   # bumps version, updates changelog, removes changesets
-   git add .
-   git commit -m "chore: release"
-   npm run release   # publishes to npm
-   ```
+```bash
+cat > .changeset/my-change.md <<'EOF'
+---
+"pi-lsp-bridge": patch
+---
 
-   Or do it all at once:
+Short description of the change
+EOF
+```
 
-   ```bash
-   npm run version && git add . && git commit -m "chore: release" && npm run release
-   ```
+Valid bump types are `patch`, `minor`, or `major`.
+
+## Commit
+
+Commit the changeset along with your code:
+
+```bash
+git add .
+git commit -m "..."
+```
+
+## Releasing
+
+When ready to release, run:
+
+```bash
+npm run version   # bumps version, updates CHANGELOG.md, removes changesets
+git add .
+git commit -m "chore: release"
+npm run release   # publishes to npm
+```
+
+Or all at once:
+
+```bash
+npm run version && git add . && git commit -m "chore: release" && npm run release
+```
 
 Changesets handles semver automatically based on the accumulated changeset bump types.
+
+## Verify pending changesets
+
+```bash
+npx changeset status
+```
