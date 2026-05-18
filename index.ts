@@ -17,7 +17,7 @@ export default async function (pi: ExtensionAPI) {
       return;
     }
 
-    manager = new LspManager(config, `file://${ctx.cwd}`);
+    manager = new LspManager(config, `file://${ctx.cwd}`, ctx.ui.notify.bind(ctx.ui));
 
     const getManager = () => {
       if (!manager) throw new Error("LSP manager not initialized");
