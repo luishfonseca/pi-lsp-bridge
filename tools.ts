@@ -92,11 +92,7 @@ async function lspRequest(
   };
 }
 
-export async function registerLspTools(
-  pi: ExtensionAPI,
-  getManager: () => LspManager,
-  _preset?: string
-) {
+export async function registerLspTools(pi: ExtensionAPI, getManager: () => LspManager) {
   pi.registerTool({
     name: "lsp_hover",
     label: "LSP Hover",
@@ -113,10 +109,15 @@ export async function registerLspTools(
       const args = params as { path: string; line: number; character: number };
       const filePath = normalizePath(args.path, ctx.cwd);
       await validatePosition(filePath, args.line, args.character);
-      return lspRequest(getManager(), "textDocument/hover", {
-        textDocument: { uri: `file://${filePath}` },
-        position: { line: args.line, character: args.character },
-      }, { filePath });
+      return lspRequest(
+        getManager(),
+        "textDocument/hover",
+        {
+          textDocument: { uri: `file://${filePath}` },
+          position: { line: args.line, character: args.character },
+        },
+        { filePath }
+      );
     },
   });
 
@@ -136,10 +137,15 @@ export async function registerLspTools(
       const args = params as { path: string; line: number; character: number };
       const filePath = normalizePath(args.path, ctx.cwd);
       await validatePosition(filePath, args.line, args.character);
-      return lspRequest(getManager(), "textDocument/definition", {
-        textDocument: { uri: `file://${filePath}` },
-        position: { line: args.line, character: args.character },
-      }, { filePath });
+      return lspRequest(
+        getManager(),
+        "textDocument/definition",
+        {
+          textDocument: { uri: `file://${filePath}` },
+          position: { line: args.line, character: args.character },
+        },
+        { filePath }
+      );
     },
   });
 
@@ -165,11 +171,16 @@ export async function registerLspTools(
       };
       const filePath = normalizePath(args.path, ctx.cwd);
       await validatePosition(filePath, args.line, args.character);
-      return lspRequest(getManager(), "textDocument/references", {
-        textDocument: { uri: `file://${filePath}` },
-        position: { line: args.line, character: args.character },
-        context: { includeDeclaration: args.includeDeclaration ?? true },
-      }, { filePath });
+      return lspRequest(
+        getManager(),
+        "textDocument/references",
+        {
+          textDocument: { uri: `file://${filePath}` },
+          position: { line: args.line, character: args.character },
+          context: { includeDeclaration: args.includeDeclaration ?? true },
+        },
+        { filePath }
+      );
     },
   });
 
@@ -184,9 +195,14 @@ export async function registerLspTools(
       if (signal?.aborted) return CANCELLED;
       const args = params as { path: string };
       const filePath = normalizePath(args.path, ctx.cwd);
-      return lspRequest(getManager(), "textDocument/documentSymbol", {
-        textDocument: { uri: `file://${filePath}` },
-      }, { filePath });
+      return lspRequest(
+        getManager(),
+        "textDocument/documentSymbol",
+        {
+          textDocument: { uri: `file://${filePath}` },
+        },
+        { filePath }
+      );
     },
   });
 
@@ -200,9 +216,14 @@ export async function registerLspTools(
     async execute(_id, params, signal) {
       if (signal?.aborted) return CANCELLED;
       const args = params as { query: string };
-      return lspRequest(getManager(), "workspace/symbol", { query: args.query }, {
-        broadcast: true,
-      });
+      return lspRequest(
+        getManager(),
+        "workspace/symbol",
+        { query: args.query },
+        {
+          broadcast: true,
+        }
+      );
     },
   });
 }

@@ -117,7 +117,7 @@ export class LspManager {
   }
 
   async disconnectAll() {
-    for (const [k, { connection, process }] of this.clients) {
+    for (const [, { connection, process }] of this.clients) {
       try {
         await connection.sendRequest("shutdown");
         await connection.sendNotification("exit");

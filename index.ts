@@ -24,7 +24,7 @@ export default async function (pi: ExtensionAPI) {
       return manager;
     };
 
-    await registerLspTools(pi, getManager, config.preset);
+    await registerLspTools(pi, getManager);
   });
 
   pi.on("session_shutdown", async () => {
