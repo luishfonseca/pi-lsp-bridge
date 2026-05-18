@@ -1,10 +1,6 @@
 import { Type } from "typebox";
-import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
-import {
-  truncateHead,
-  DEFAULT_MAX_BYTES,
-  DEFAULT_MAX_LINES,
-} from "@mariozechner/pi-coding-agent";
+import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import { truncateHead, DEFAULT_MAX_BYTES, DEFAULT_MAX_LINES } from "@mariozechner/pi-coding-agent";
 import type { LspManager } from "./manager.js";
 
 function posParams() {
@@ -31,6 +27,7 @@ export function registerLspTools(pi: ExtensionAPI, getManager: () => LspManager)
     label: string,
     description: string,
     parameters: any,
+    method: string,
     buildParams: (p: any) => any
   ) => {
     pi.registerTool({
@@ -39,9 +36,15 @@ export function registerLspTools(pi: ExtensionAPI, getManager: () => LspManager)
       description,
       parameters,
       async execute(_id, params, signal) {
-        if (signal?.aborted) return { content: [{ type: "text", text: "Cancelled" }] };
+        if (signal?.aborted) {
+          return {
+            content: [{ type: "text", text: "Cancelled" }],
+            details: { raw: null },
+          };
+        }
         const mgr = getManager();
-        const result = await mgr.request(params.path, buildParams(params));
+        const args = params as Record<string, any>;
+        const result = await mgr.request(args.path, method, buildParams(args));
         return {
           content: [{ type: "text", text: formatResult(result) }],
           details: { raw: result },
@@ -55,6 +58,7 @@ export function registerLspTools(pi: ExtensionAPI, getManager: () => LspManager)
     "LSP Hover",
     "Get hover information (types, docs) from the language server",
     posParams(),
+    "textDocument/hover",
     (p) => ({
       textDocument: { uri: `file://${p.path}` },
       position: { line: p.line, character: p.character },
@@ -66,6 +70,7 @@ export function registerLspTools(pi: ExtensionAPI, getManager: () => LspManager)
     "LSP Definition",
     "Go to definition via LSP",
     posParams(),
+    "textDocument/definition",
     (p) => ({
       textDocument: { uri: `file://${p.path}` },
       position: { line: p.line, character: p.character },
@@ -80,6 +85,7 @@ export function registerLspTools(pi: ExtensionAPI, getManager: () => LspManager)
       ...posParams().properties,
       includeDeclaration: Type.Optional(Type.Boolean({ default: true })),
     }),
+    "textDocument/references",
     (p) => ({
       textDocument: { uri: `file://${p.path}` },
       position: { line: p.line, character: p.character },
@@ -92,6 +98,7 @@ export function registerLspTools(pi: ExtensionAPI, getManager: () => LspManager)
     "LSP Document Symbols",
     "Get outline (functions, classes, variables) of a file",
     Type.Object({ path: Type.String() }),
+    "textDocument/documentSymbol",
     (p) => ({ textDocument: { uri: `file://${p.path}` } })
   );
 
@@ -100,6 +107,7 @@ export function registerLspTools(pi: ExtensionAPI, getManager: () => LspManager)
     "LSP Workspace Symbol",
     "Search symbols across the entire workspace",
     Type.Object({ query: Type.String() }),
+    "workspace/symbol",
     (p) => ({ query: p.query })
   );
 }

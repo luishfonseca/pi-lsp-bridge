@@ -12,7 +12,10 @@ type Connection = {
 
 export class LspManager {
   private clients = new Map<string, Connection>(); // key = rootUri + "|" + serverKey
-  constructor(private config: LspConfig, private rootUri: string) {}
+  constructor(
+    private config: LspConfig,
+    private rootUri: string
+  ) {}
 
   private key(serverKey: string) {
     return `${this.rootUri}|${serverKey}`;
@@ -74,7 +77,7 @@ export class LspManager {
   }
 
   async disconnectAll() {
-    for (const [k, { client, process }] of this.clients) {
+    for (const [, { client, process }] of this.clients) {
       try {
         await client.disconnect();
       } catch {
