@@ -25,7 +25,7 @@
   },
   "files": [
     "dist",
-    "*.ts",
+    "tools",
     "README.md",
     "LICENSE"
   ],
@@ -61,7 +61,7 @@
   "homepage": "https://github.com/yourusername/pi-lsp-bridge#readme",
   "pi": {
     "extensions": [
-      "./index.ts"
+      "./dist/index.js"
     ]
   },
   "dependencies": {

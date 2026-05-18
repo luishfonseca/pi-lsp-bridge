@@ -1,6 +1,7 @@
-import { mkdtemp, writeFile } from "node:fs/promises";
+import { mkdtemp, writeFile, readFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
+import { fileURLToPath } from "node:url";
 import { Type } from "typebox";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
@@ -11,13 +12,44 @@ import {
 } from "@earendil-works/pi-coding-agent";
 import type { LspManager } from "./manager.js";
 
-function posParams() {
-  return Type.Object({
-    path: Type.String({ description: "Absolute or relative file path" }),
-    line: Type.Number({ description: "0-based line number" }),
-    character: Type.Number({ description: "0-based character/ column" }),
-  });
-}
+const MAPPERS = {
+  textDocument: {
+    needsFile: true,
+    parameters: Type.Object({ path: Type.String() }),
+    buildParams: (p: any) => ({ textDocument: { uri: `file://${p.path}` } }),
+  },
+  textDocumentPosition: {
+    needsFile: true,
+    parameters: Type.Object({
+      path: Type.String(),
+      line: Type.Number(),
+      character: Type.Number(),
+    }),
+    buildParams: (p: any) => ({
+      textDocument: { uri: `file://${p.path}` },
+      position: { line: p.line, character: p.character },
+    }),
+  },
+  textDocumentPositionContext: {
+    needsFile: true,
+    parameters: Type.Object({
+      path: Type.String(),
+      line: Type.Number(),
+      character: Type.Number(),
+      includeDeclaration: Type.Optional(Type.Boolean({ default: true })),
+    }),
+    buildParams: (p: any) => ({
+      textDocument: { uri: `file://${p.path}` },
+      position: { line: p.line, character: p.character },
+      context: { includeDeclaration: p.includeDeclaration ?? true },
+    }),
+  },
+  workspaceSymbol: {
+    needsFile: false,
+    parameters: Type.Object({ query: Type.String() }),
+    buildParams: (p: any) => ({ query: p.query }),
+  },
+};
 
 async function formatResult(obj: unknown): Promise<{ text: string; details?: any }> {
   const json = JSON.stringify(obj, null, 2);
@@ -42,30 +74,36 @@ async function formatResult(obj: unknown): Promise<{ text: string; details?: any
   };
 }
 
-export function registerLspTools(pi: ExtensionAPI, getManager: () => LspManager) {
-  const mk = (
-    name: string,
-    label: string,
-    description: string,
-    parameters: any,
-    method: string,
-    buildParams: (p: any) => any
-  ) => {
+export async function registerLspTools(
+  pi: ExtensionAPI,
+  getManager: () => LspManager,
+  preset?: string
+) {
+  const name = preset ?? "full";
+  const here = fileURLToPath(new URL(".", import.meta.url));
+  const base = here.endsWith("/dist/") ? resolve(here, "..") : here;
+  const file = resolve(base, "tools", `${name}.json`);
+  const raw = await readFile(file, "utf8");
+  const defs = JSON.parse(raw);
+
+  for (const def of defs) {
+    const mapper = (MAPPERS as any)[def.mapper];
+    if (!mapper) throw new Error(`Unknown mapper "${def.mapper}" in ${def.name}`);
+
     pi.registerTool({
-      name,
-      label,
-      description,
-      parameters,
+      name: def.name,
+      label: def.label,
+      description: def.description,
+      promptSnippet: def.promptSnippet,
+      promptGuidelines: def.promptGuidelines,
+      parameters: mapper.parameters,
       async execute(_id, params, signal, _onUpdate, ctx) {
         if (signal?.aborted) {
-          return {
-            content: [{ type: "text", text: "Cancelled" }],
-            details: { raw: null },
-          };
+          return { content: [{ type: "text", text: "Cancelled" }], details: { raw: null } };
         }
         const mgr = getManager();
         const args = params as Record<string, any>;
-        let filePath = args.path;
+        let filePath = mapper.needsFile ? args.path : undefined;
         if (typeof filePath === "string") {
           filePath = filePath.replace(/^@/, "");
           if (!filePath.startsWith("/")) {
@@ -73,7 +111,7 @@ export function registerLspTools(pi: ExtensionAPI, getManager: () => LspManager)
           }
         }
         const normalizedArgs = { ...args, path: filePath };
-        const result = await mgr.request(filePath, method, buildParams(normalizedArgs));
+        const result = await mgr.request(filePath, def.method, mapper.buildParams(normalizedArgs));
         const formatted = await formatResult(result);
         return {
           content: [{ type: "text", text: formatted.text }],
@@ -81,63 +119,5 @@ export function registerLspTools(pi: ExtensionAPI, getManager: () => LspManager)
         };
       },
     });
-  };
-
-  mk(
-    "lsp_hover",
-    "LSP Hover",
-    "Get hover information (types, docs) from the language server",
-    posParams(),
-    "textDocument/hover",
-    (p) => ({
-      textDocument: { uri: `file://${p.path}` },
-      position: { line: p.line, character: p.character },
-    })
-  );
-
-  mk(
-    "lsp_definition",
-    "LSP Definition",
-    "Go to definition via LSP",
-    posParams(),
-    "textDocument/definition",
-    (p) => ({
-      textDocument: { uri: `file://${p.path}` },
-      position: { line: p.line, character: p.character },
-    })
-  );
-
-  mk(
-    "lsp_references",
-    "LSP References",
-    "Find references to a symbol via LSP",
-    Type.Object({
-      ...posParams().properties,
-      includeDeclaration: Type.Optional(Type.Boolean({ default: true })),
-    }),
-    "textDocument/references",
-    (p) => ({
-      textDocument: { uri: `file://${p.path}` },
-      position: { line: p.line, character: p.character },
-      context: { includeDeclaration: p.includeDeclaration ?? true },
-    })
-  );
-
-  mk(
-    "lsp_document_symbols",
-    "LSP Document Symbols",
-    "Get outline (functions, classes, variables) of a file",
-    Type.Object({ path: Type.String() }),
-    "textDocument/documentSymbol",
-    (p) => ({ textDocument: { uri: `file://${p.path}` } })
-  );
-
-  mk(
-    "lsp_workspace_symbol",
-    "LSP Workspace Symbol",
-    "Search symbols across the entire workspace",
-    Type.Object({ query: Type.String() }),
-    "workspace/symbol",
-    (p) => ({ query: p.query })
-  );
+  }
 }

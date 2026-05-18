@@ -47,14 +47,15 @@ When ready to release, run:
 npm run version   # bumps version, updates CHANGELOG.md, removes changesets
 git add .
 git commit -m "chore: release"
-npm run release   # publishes to npm
 ```
 
 Or all at once:
 
 ```bash
-npm run version && git add . && git commit -m "chore: release" && npm run release
+npm run version && git add . && git commit -m "chore: release"
 ```
+
+Tell the user to `npm run release`
 
 Changesets handles semver automatically based on the accumulated changeset bump types.
 

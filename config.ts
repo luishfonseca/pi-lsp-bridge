@@ -11,6 +11,8 @@ export type LspConfig = {
   extMap: Record<string, string>;
   /** Server definitions */
   servers: Record<string, ServerConfig>;
+  /** Preset name (loads tools/<preset>.json). Defaults to "full". */
+  preset?: string;
 };
 
 export async function loadConfig(cwd: string): Promise<LspConfig | null> {

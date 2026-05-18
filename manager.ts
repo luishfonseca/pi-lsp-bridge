@@ -66,13 +66,19 @@ export class LspManager {
   }
 
   /** Make an LSP request after ensuring the file is open */
-  async request<T>(filePath: string, method: string, params: unknown): Promise<T> {
-    const serverKey = this.resolveServerKey(filePath);
-    if (!serverKey) throw new Error(`No LSP server mapped for ${filePath}`);
+  async request<T>(filePath: string | undefined, method: string, params: unknown): Promise<T> {
+    let serverKey: string | undefined;
 
-    await this.ensureOpen(filePath, serverKey);
+    if (filePath) {
+      serverKey = this.resolveServerKey(filePath);
+      if (!serverKey) throw new Error(`No LSP server mapped for ${filePath}`);
+      await this.ensureOpen(filePath, serverKey);
+    } else {
+      serverKey = Object.keys(this.config.servers)[0];
+      if (!serverKey) throw new Error(`No LSP servers configured`);
+    }
+
     const client = await this.ensureClient(serverKey);
-
     return (await client.sendRequest(method as any, params)) as T;
   }
 
