@@ -1,7 +1,6 @@
-import { mkdtemp, writeFile, readFile } from "node:fs/promises";
+import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { resolve, join } from "node:path";
-import { fileURLToPath } from "node:url";
 import { Type } from "typebox";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import {
@@ -11,45 +10,6 @@ import {
   formatSize,
 } from "@earendil-works/pi-coding-agent";
 import type { LspManager } from "./manager.js";
-
-const MAPPERS = {
-  textDocument: {
-    needsFile: true,
-    parameters: Type.Object({ path: Type.String() }),
-    buildParams: (p: any) => ({ textDocument: { uri: `file://${p.path}` } }),
-  },
-  textDocumentPosition: {
-    needsFile: true,
-    parameters: Type.Object({
-      path: Type.String(),
-      line: Type.Number(),
-      character: Type.Number(),
-    }),
-    buildParams: (p: any) => ({
-      textDocument: { uri: `file://${p.path}` },
-      position: { line: p.line, character: p.character },
-    }),
-  },
-  textDocumentPositionContext: {
-    needsFile: true,
-    parameters: Type.Object({
-      path: Type.String(),
-      line: Type.Number(),
-      character: Type.Number(),
-      includeDeclaration: Type.Optional(Type.Boolean({ default: true })),
-    }),
-    buildParams: (p: any) => ({
-      textDocument: { uri: `file://${p.path}` },
-      position: { line: p.line, character: p.character },
-      context: { includeDeclaration: p.includeDeclaration ?? true },
-    }),
-  },
-  workspaceSymbol: {
-    needsFile: false,
-    parameters: Type.Object({ query: Type.String() }),
-    buildParams: (p: any) => ({ query: p.query }),
-  },
-};
 
 async function formatResult(obj: unknown): Promise<{ text: string; details?: any }> {
   const json = JSON.stringify(obj, null, 2);
@@ -77,47 +37,158 @@ async function formatResult(obj: unknown): Promise<{ text: string; details?: any
 export async function registerLspTools(
   pi: ExtensionAPI,
   getManager: () => LspManager,
-  preset?: string
+  _preset?: string
 ) {
-  const name = preset ?? "full";
-  const here = fileURLToPath(new URL(".", import.meta.url));
-  const base = here.endsWith("/dist/") ? resolve(here, "..") : here;
-  const file = resolve(base, "tools", `${name}.json`);
-  const raw = await readFile(file, "utf8");
-  const defs = JSON.parse(raw);
+  pi.registerTool({
+    name: "lsp_hover",
+    label: "LSP Hover",
+    description: "Get hover information (types, docs) from the language server",
+    promptSnippet: "Get type/docs info at a file position",
+    promptGuidelines: ["Use lsp_hover when you need to verify a symbol's type or documentation."],
+    parameters: Type.Object({
+      path: Type.String(),
+      line: Type.Number(),
+      character: Type.Number(),
+    }),
+    async execute(_id, params, signal, _onUpdate, ctx) {
+      if (signal?.aborted) {
+        return { content: [{ type: "text", text: "Cancelled" }], details: { raw: null } };
+      }
+      const args = params as { path: string; line: number; character: number };
+      let filePath = args.path.replace(/^@/, "");
+      if (!filePath.startsWith("/")) {
+        filePath = resolve(ctx.cwd, filePath);
+      }
+      const result = await getManager().request(filePath, "textDocument/hover", {
+        textDocument: { uri: `file://${filePath}` },
+        position: { line: args.line, character: args.character },
+      });
+      const formatted = await formatResult(result);
+      return {
+        content: [{ type: "text", text: formatted.text }],
+        details: { raw: result, ...formatted.details },
+      };
+    },
+  });
 
-  for (const def of defs) {
-    const mapper = (MAPPERS as any)[def.mapper];
-    if (!mapper) throw new Error(`Unknown mapper "${def.mapper}" in ${def.name}`);
+  pi.registerTool({
+    name: "lsp_definition",
+    label: "LSP Definition",
+    description: "Go to definition via LSP",
+    promptSnippet: "Jump to a symbol's definition",
+    promptGuidelines: ["Use lsp_definition to find where a symbol is declared."],
+    parameters: Type.Object({
+      path: Type.String(),
+      line: Type.Number(),
+      character: Type.Number(),
+    }),
+    async execute(_id, params, signal, _onUpdate, ctx) {
+      if (signal?.aborted) {
+        return { content: [{ type: "text", text: "Cancelled" }], details: { raw: null } };
+      }
+      const args = params as { path: string; line: number; character: number };
+      let filePath = args.path.replace(/^@/, "");
+      if (!filePath.startsWith("/")) {
+        filePath = resolve(ctx.cwd, filePath);
+      }
+      const result = await getManager().request(filePath, "textDocument/definition", {
+        textDocument: { uri: `file://${filePath}` },
+        position: { line: args.line, character: args.character },
+      });
+      const formatted = await formatResult(result);
+      return {
+        content: [{ type: "text", text: formatted.text }],
+        details: { raw: result, ...formatted.details },
+      };
+    },
+  });
 
-    pi.registerTool({
-      name: def.name,
-      label: def.label,
-      description: def.description,
-      promptSnippet: def.promptSnippet,
-      promptGuidelines: def.promptGuidelines,
-      parameters: mapper.parameters,
-      async execute(_id, params, signal, _onUpdate, ctx) {
-        if (signal?.aborted) {
-          return { content: [{ type: "text", text: "Cancelled" }], details: { raw: null } };
-        }
-        const mgr = getManager();
-        const args = params as Record<string, any>;
-        let filePath = mapper.needsFile ? args.path : undefined;
-        if (typeof filePath === "string") {
-          filePath = filePath.replace(/^@/, "");
-          if (!filePath.startsWith("/")) {
-            filePath = resolve(ctx.cwd, filePath);
-          }
-        }
-        const normalizedArgs = { ...args, path: filePath };
-        const result = await mgr.request(filePath, def.method, mapper.buildParams(normalizedArgs));
-        const formatted = await formatResult(result);
-        return {
-          content: [{ type: "text", text: formatted.text }],
-          details: { raw: result, ...formatted.details },
-        };
-      },
-    });
-  }
+  pi.registerTool({
+    name: "lsp_references",
+    label: "LSP References",
+    description: "Find references to a symbol via LSP",
+    promptSnippet: "Find all usages of a symbol",
+    promptGuidelines: ["Use lsp_references before refactoring to understand blast radius."],
+    parameters: Type.Object({
+      path: Type.String(),
+      line: Type.Number(),
+      character: Type.Number(),
+      includeDeclaration: Type.Optional(Type.Boolean({ default: true })),
+    }),
+    async execute(_id, params, signal, _onUpdate, ctx) {
+      if (signal?.aborted) {
+        return { content: [{ type: "text", text: "Cancelled" }], details: { raw: null } };
+      }
+      const args = params as {
+        path: string;
+        line: number;
+        character: number;
+        includeDeclaration?: boolean;
+      };
+      let filePath = args.path.replace(/^@/, "");
+      if (!filePath.startsWith("/")) {
+        filePath = resolve(ctx.cwd, filePath);
+      }
+      const result = await getManager().request(filePath, "textDocument/references", {
+        textDocument: { uri: `file://${filePath}` },
+        position: { line: args.line, character: args.character },
+        context: { includeDeclaration: args.includeDeclaration ?? true },
+      });
+      const formatted = await formatResult(result);
+      return {
+        content: [{ type: "text", text: formatted.text }],
+        details: { raw: result, ...formatted.details },
+      };
+    },
+  });
+
+  pi.registerTool({
+    name: "lsp_document_symbols",
+    label: "LSP Document Symbols",
+    description: "Get outline (functions, classes, variables) of a file",
+    promptSnippet: "List symbols in a file",
+    promptGuidelines: ["Use lsp_document_symbols to build a mental map of an unfamiliar file."],
+    parameters: Type.Object({ path: Type.String() }),
+    async execute(_id, params, signal, _onUpdate, ctx) {
+      if (signal?.aborted) {
+        return { content: [{ type: "text", text: "Cancelled" }], details: { raw: null } };
+      }
+      const args = params as { path: string };
+      let filePath = args.path.replace(/^@/, "");
+      if (!filePath.startsWith("/")) {
+        filePath = resolve(ctx.cwd, filePath);
+      }
+      const result = await getManager().request(filePath, "textDocument/documentSymbol", {
+        textDocument: { uri: `file://${filePath}` },
+      });
+      const formatted = await formatResult(result);
+      return {
+        content: [{ type: "text", text: formatted.text }],
+        details: { raw: result, ...formatted.details },
+      };
+    },
+  });
+
+  pi.registerTool({
+    name: "lsp_workspace_symbol",
+    label: "LSP Workspace Symbol",
+    description: "Search symbols across the entire workspace",
+    promptSnippet: "Search symbols workspace-wide",
+    promptGuidelines: ["Use lsp_workspace_symbol when you know a name but not its file."],
+    parameters: Type.Object({ query: Type.String() }),
+    async execute(_id, params, signal) {
+      if (signal?.aborted) {
+        return { content: [{ type: "text", text: "Cancelled" }], details: { raw: null } };
+      }
+      const args = params as { query: string };
+      const result = await getManager().request(undefined, "workspace/symbol", {
+        query: args.query,
+      });
+      const formatted = await formatResult(result);
+      return {
+        content: [{ type: "text", text: formatted.text }],
+        details: { raw: result, ...formatted.details },
+      };
+    },
+  });
 }
