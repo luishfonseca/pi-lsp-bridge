@@ -11,8 +11,13 @@ A config-driven Pi extension that connects language servers over stdio and expos
 ## Install
 
 ```bash
-ln -s ~/projects/fun/pi-lsp-bridge ~/.pi/agent/extensions/lsp-bridge
-cd ~/.pi/agent/extensions/lsp-bridge && npm install
+pi install npm:pi-lsp-bridge
+```
+
+Or add it to your project settings (`.pi/settings.json`):
+
+```bash
+pi install -l npm:pi-lsp-bridge
 ```
 
 ## Configuration
